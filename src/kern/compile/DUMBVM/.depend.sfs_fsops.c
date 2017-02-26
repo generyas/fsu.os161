@@ -4,7 +4,10 @@ sfs_fsops.o: ../../fs/sfs/sfs_fsops.c ../../include/types.h \
  ../../include/lib.h ../../include/cdefs.h opt-noasserts.h \
  ../../include/array.h ../../include/bitmap.h ../../include/synch.h \
  ../../include/spinlock.h ../../include/hangman.h opt-hangman.h \
- includelinks/machine/spinlock.h ../../include/uio.h \
- ../../include/kern/iovec.h ../../include/vfs.h ../../include/buf.h \
- ../../include/device.h ../../include/sfs.h ../../include/fs.h \
- ../../include/vnode.h ../../include/kern/sfs.h ../../fs/sfs/sfsprivate.h
+ includelinks/machine/spinlock.h ../../include/thread.h \
+ ../../include/threadlist.h includelinks/machine/thread.h \
+ ../../include/setjmp.h includelinks/kern/machine/setjmp.h \
+ ../../include/uio.h ../../include/kern/iovec.h ../../include/vfs.h \
+ ../../include/buf.h ../../include/device.h ../../include/sfs.h \
+ ../../include/fs.h ../../include/vnode.h ../../include/kern/sfs.h \
+ ../../fs/sfs/sfsprivate.h
