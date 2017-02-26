@@ -80,9 +80,6 @@ struct lock {
 
 	// if NULL lock is free, otherwise lock is busy
 	volatile thread * thread_owner;
-        
-	// add what you need here
-        // (don't forget to mark things volatile as needed)
 };
 
 struct lock *lock_create(const char *name);
@@ -120,8 +117,8 @@ bool lock_do_i_hold(struct lock *);
 
 struct cv {
         char *cv_name;
-        // add what you need here
-        // (don't forget to mark things volatile as needed)
+	struct wchan *cv_wchan;
+	struct spinlock spinlock;
 };
 
 struct cv *cv_create(const char *name);
