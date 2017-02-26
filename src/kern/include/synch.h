@@ -80,7 +80,8 @@ struct lock {
 	struct spinlock spinlock;
 
 	// if NULL lock is free, otherwise lock is busy
-	volatile struct thread * thread_owner;
+	struct thread * thread_owner;
+	volatile bool locked;
 };
 
 struct lock *lock_create(const char *name);

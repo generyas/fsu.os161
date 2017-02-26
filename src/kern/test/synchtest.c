@@ -187,10 +187,6 @@ locktestthread(void *junk, unsigned long num)
 		}
 
 		lock_release(testlock);
-		if (i == 119)
-        	{
-			kprintf("%lu,%lu,%lu,%lu\n",num,testval1,testval2,testval3);
-        	}
 	}
 	V(donesem);
 }
@@ -235,7 +231,7 @@ cvtestthread(void *junk, unsigned long num)
 	(void)junk;
 
 	for (i=0; i<NCVLOOPS; i++) {
-		lock_acquire(testlock);
+		lock_acquire(testlock);	
 		while (testval1 != num) {
 			gettime(&ts1);
 			cv_wait(testcv, testlock);
