@@ -36,6 +36,7 @@
 
 
 #include <spinlock.h>
+#include <thread.h>
 
 /*
  * Dijkstra-style semaphore.
@@ -79,7 +80,7 @@ struct lock {
 	struct spinlock spinlock;
 
 	// if NULL lock is free, otherwise lock is busy
-	volatile thread * thread_owner;
+	volatile struct thread * thread_owner;
 };
 
 struct lock *lock_create(const char *name);
