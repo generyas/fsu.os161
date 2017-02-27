@@ -145,7 +145,7 @@ fail(unsigned long num, const char *msg)
 
 	lock_release(testlock);
 
-	V(donesem);
+	//V(donesem);
 	thread_exit();
 }
 
@@ -188,7 +188,7 @@ locktestthread(void *junk, unsigned long num)
 
 		lock_release(testlock);
 	}
-	V(donesem);
+	//V(donesem);
 }
 
 
@@ -204,7 +204,7 @@ locktest(int nargs, char **args)
 	kprintf("Starting lock test...\n");
 
 	for (i=0; i<NTHREADS; i++) {
-		result = thread_fork("synchtest", NULL, locktestthread,
+		result = thread_fork_joinable("synchtest", NULL, locktestthread,
 				     NULL, i);
 		if (result) {
 			panic("locktest: thread_fork failed: %s\n",
@@ -212,7 +212,8 @@ locktest(int nargs, char **args)
 		}
 	}
 	for (i=0; i<NTHREADS; i++) {
-		P(donesem);
+        kprintf("Thread ID: %d\n", thread_join());
+		//P(donesem);
 	}
 
 	kprintf("Lock test done.\n");
@@ -246,7 +247,7 @@ cvtestthread(void *junk, unsigned long num)
 					ts2.tv_nsec);
 				kprintf("That's too fast... you must be "
 					"busy-looping\n");
-				V(donesem);
+				//V(donesem);
 				thread_exit();
 			}
 
@@ -263,7 +264,7 @@ cvtestthread(void *junk, unsigned long num)
 		cv_broadcast(testcv, testlock);
 		lock_release(testlock);
 	}
-	V(donesem);
+	//V(donesem);
 }
 
 int
@@ -282,14 +283,15 @@ cvtest(int nargs, char **args)
 	testval1 = NTHREADS-1;
 
 	for (i=0; i<NTHREADS; i++) {
-		result = thread_fork("synchtest", NULL, cvtestthread, NULL, i);
+		result = thread_fork_joinable("synchtest", NULL, cvtestthread, NULL, i);
 		if (result) {
 			panic("cvtest: thread_fork failed: %s\n",
 			      strerror(result));
 		}
 	}
 	for (i=0; i<NTHREADS; i++) {
-		P(donesem);
+        thread_join();
+		//P(donesem);
 	}
 
 	kprintf("CV test done\n");

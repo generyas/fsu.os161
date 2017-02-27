@@ -281,21 +281,21 @@ lock_do_i_hold(struct lock *lock)
 struct cv *
 cv_create(const char *name)
 {
-        struct cv *cv;
+    struct cv *cv;
 
-        cv = kmalloc(sizeof(*cv));
-        if (cv == NULL) {
-                return NULL;
-        }
+    cv = kmalloc(sizeof(*cv));
+    if (cv == NULL) {
+        return NULL;
+    }
 
-        cv->cv_name = kstrdup(name);
-        if (cv->cv_name==NULL) {
-                kfree(cv);
-                return NULL;
-        }
+    cv->cv_name = kstrdup(name);
+    if (cv->cv_name==NULL) {
+        kfree(cv);
+        return NULL;
+    }
 
 
-        cv->cv_wchan = wchan_create(cv->cv_name);
+    cv->cv_wchan = wchan_create(cv->cv_name);
 	if (cv->cv_wchan == NULL) {
 		kfree(cv->cv_name);
 		kfree(cv);
@@ -303,21 +303,19 @@ cv_create(const char *name)
 	}
 
 	spinlock_init(&cv->spinlock);
-
-
-        return cv;
+    return cv;
 }
 
 void
 cv_destroy(struct cv *cv)
 {
-        KASSERT(cv != NULL);
+    KASSERT(cv != NULL);
 
-	wchan_destroy(cv->cv_wchan);
-        spinlock_cleanup(&cv->spinlock);
+    wchan_destroy(cv->cv_wchan);
+    spinlock_cleanup(&cv->spinlock);
 
-        kfree(cv->cv_name);
-        kfree(cv);
+    kfree(cv->cv_name);
+    kfree(cv);
 }
 
 void

@@ -69,6 +69,17 @@ static struct cpuarray allcpus;
 /* Used to wait for secondary CPUs to come online. */
 static struct semaphore *cpu_startup_sem;
 
+/* List of avalible thread ID's */
+#define ID_LIST_SIZE 8192
+
+struct threadidlist {
+    int last_id;
+    bool id_list[ID_LIST_SIZE];
+    struct spinlock tid_lock;
+};
+
+static struct threadidlist idlist;
+
 ////////////////////////////////////////////////////////////
 
 /*
@@ -151,7 +162,18 @@ thread_create(const char *name)
 	thread->t_did_reserve_buffers = false;
 
 	/* If you add to struct thread, be sure to initialize here */
-
+    
+    /* Thread join fields */
+    thread->t_id = 0;
+    
+    thread->t_parent_cv = NULL;         
+    thread->t_parent_lock = NULL;
+    thread->t_parent_waiting_to_join = NULL;
+    
+    thread->t_child_cv = cv_create("thread_join");
+    thread->t_child_lock = lock_create("thread_join");
+    thread->t_waiting_to_join = 0;
+    
 	return thread;
 }
 
@@ -397,7 +419,11 @@ thread_bootstrap(void)
 	KASSERT(curthread->t_proc != NULL);
 	KASSERT(curthread->t_proc == kproc);
 
+    /* Initilize thread spinlock  */
+    spinlock_init(&idlist.tid_lock);
+    
 	/* Done */
+    
 }
 
 /*
@@ -437,7 +463,7 @@ thread_start_cpus(void)
 
 	cpu_identify(buf, sizeof(buf));
 	kprintf("cpu0: %s\n", buf);
-
+    
 	cpu_startup_sem = sem_create("cpu_hatch", 0);
 	mainbus_start_cpus();
 
@@ -551,6 +577,128 @@ thread_fork(const char *name,
 	thread_make_runnable(newthread, false);
 
 	return 0;
+}
+
+int
+get_next_threadid(void) {  
+    spinlock_acquire(&idlist.tid_lock);
+    
+    int test_id = idlist.last_id;
+    while (++test_id != idlist.last_id) {
+        if (test_id == ID_LIST_SIZE)
+            test_id = 1;
+        
+        if (!idlist.id_list[test_id]) {
+            idlist.id_list[test_id] = 1;
+            idlist.last_id = test_id;
+            spinlock_release(&idlist.tid_lock);
+            return test_id;
+        }
+    }
+    spinlock_release(&idlist.tid_lock);
+    return 0;
+}
+
+void
+release_threadid(int id) {
+    if (id == 0)
+        return;
+
+    spinlock_acquire(&idlist.tid_lock);   
+    idlist.id_list[id] = 0;
+    if (id < idlist.last_id) {
+        if (!(--id < 1))
+            idlist.last_id = id;
+    }
+    
+    spinlock_release(&idlist.tid_lock);
+}
+
+
+int
+thread_fork_joinable(const char *name,
+	    struct proc *proc,
+	    void (*entrypoint)(void *data1, unsigned long data2),
+	    void *data1, unsigned long data2)
+{
+	struct thread *newthread;
+	int result;
+
+	newthread = thread_create(name);
+	if (newthread == NULL) {
+		return ENOMEM;
+	}
+
+	/* Allocate a stack */
+	newthread->t_stack = kmalloc(STACK_SIZE);
+	if (newthread->t_stack == NULL) {
+		thread_destroy(newthread);
+		return ENOMEM;
+	}
+	thread_checkstack_init(newthread);
+
+	/*
+	 * Now we clone various fields from the parent thread.
+	 */
+
+	/* Thread subsystem fields */
+	newthread->t_cpu = curthread->t_cpu;
+
+	/* Attach the new thread to its process */
+	if (proc == NULL) {
+		proc = curthread->t_proc;
+	}
+	result = proc_addthread(proc, newthread);
+	if (result) {
+		/* thread_destroy will clean up the stack */
+		thread_destroy(newthread);
+		return result;
+	}
+    
+    /* Set the thread's ID to the next avalible ID */
+    newthread->t_id = get_next_threadid();
+    KASSERT(newthread->t_id > 0);
+    
+    /* Set the thread's parent join pair to the parent's child join pair */
+    newthread->t_parent_cv = curthread->t_child_cv;
+    newthread->t_parent_lock = curthread->t_child_lock;
+    newthread->t_parent_waiting_to_join = &curthread->t_waiting_to_join;
+        
+	/*
+	 * Because new threads come out holding the cpu runqueue lock
+	 * (see notes at bottom of thread_switch), we need to account
+	 * for the spllower() that will be done releasing it.
+	 */
+	newthread->t_iplhigh_count++;
+
+	/* Set up the switchframe so entrypoint() gets called */
+	switchframe_init(newthread, entrypoint, data1, data2);
+
+	/* Lock the current cpu's run queue and make the new thread runnable */
+	thread_make_runnable(newthread, false);
+
+	return 0;
+}
+
+/* Signals to child that parent is wating to join
+ * Waits for child thread to call thread_exit
+ * Gets and returns the thread id of the last child to call thread_exit
+ */
+
+int
+thread_join(void)
+{
+    int return_tid;
+    lock_acquire(curthread->t_child_lock);
+    
+    curthread->t_waiting_to_join = -1;
+    cv_signal(curthread->t_child_cv, curthread->t_child_lock);
+    while(curthread->t_waiting_to_join == -1) 
+        cv_wait(curthread->t_child_cv, curthread->t_child_lock);
+    return_tid = curthread->t_waiting_to_join;
+    
+    lock_release(curthread->t_child_lock);
+    return return_tid;
 }
 
 /*
@@ -787,9 +935,30 @@ thread_exit(void)
 	struct thread *cur;
 
 	cur = curthread;
+    int cur_tid = cur->t_id;
 
 	KASSERT(cur->t_did_reserve_buffers == false);
 
+    /* For joinable threads (id > 0) wait for parent to call thread_join
+     * Then signal to parent that a child thread has finished */
+    if (cur->t_id){
+        lock_acquire(cur->t_parent_lock);
+        
+        while(*cur->t_parent_waiting_to_join != -1)
+            cv_wait(cur->t_parent_cv, cur->t_parent_lock);
+        *cur->t_parent_waiting_to_join = cur->t_id;
+        cv_broadcast(cur->t_parent_cv, cur->t_parent_lock);
+        
+        lock_release(cur->t_parent_lock);
+    }
+    
+    /* Cleanup child join pair as thread will no longer create children */
+    cv_destroy(cur->t_child_cv);
+    lock_destroy(cur->t_child_lock);
+     
+    /* Allow thread ID to be reused  */
+    release_threadid(cur_tid);
+    
 	/*
 	 * Detach from our process. You might need to move this action
 	 * around, depending on how your wait/exit works.

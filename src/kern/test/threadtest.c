@@ -64,7 +64,7 @@ loudthread(void *junk, unsigned long num)
 	for (i=0; i<120; i++) {
 		putch(ch);
 	}
-	V(tsem);
+	//V(tsem);
 }
 
 /*
@@ -90,7 +90,7 @@ quietthread(void *junk, unsigned long num)
 	for (i=0; i<200000; i++);
 	putch(ch);
 
-	V(tsem);
+	//V(tsem);
 }
 
 static
@@ -102,7 +102,7 @@ runthreads(int doloud)
 
 	for (i=0; i<NTHREADS; i++) {
 		snprintf(name, sizeof(name), "threadtest%d", i);
-		result = thread_fork(name, NULL,
+		result = thread_fork_joinable(name, NULL,
 				     doloud ? loudthread : quietthread,
 				     NULL, i);
 		if (result) {
@@ -112,7 +112,8 @@ runthreads(int doloud)
 	}
 
 	for (i=0; i<NTHREADS; i++) {
-		P(tsem);
+        thread_join();
+		//P(tsem);
 	}
 }
 

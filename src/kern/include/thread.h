@@ -55,7 +55,6 @@ struct cpu;
 /* Macro to test if two addresses are on the same kernel stack */
 #define SAME_STACK(p1, p2)     (((p1) & STACK_MASK) == ((p2) & STACK_MASK))
 
-
 /* States a thread can be in. */
 typedef enum {
 	S_RUN,		/* running */
@@ -110,6 +109,15 @@ struct thread {
 	bool t_did_reserve_buffers;	/* reserve_buffers() in effect */
 
 	/* add more here as needed */
+    int t_id;                       /* Thread ID */
+    
+    struct cv *t_parent_cv;         /* CV pair to signal parent thread */
+    struct lock *t_parent_lock;
+    int *t_parent_waiting_to_join;
+    
+    struct cv *t_child_cv;          /* CV pair to signal child threads */
+    struct lock *t_child_lock;
+    int t_waiting_to_join;
 };
 
 /*
@@ -147,6 +155,15 @@ void thread_shutdown(void);
 int thread_fork(const char *name, struct proc *proc,
                 void (*func)(void *, unsigned long),
                 void *data1, unsigned long data2);
+
+int get_next_threadid(void);
+void release_threadid(int id);
+
+int thread_fork_joinable(const char *name, struct proc *proc,
+                void (*func)(void *, unsigned long),
+                void *data1, unsigned long data2);
+
+int thread_join(void);
 
 /*
  * Cause the current thread to exit.
