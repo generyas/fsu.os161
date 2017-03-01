@@ -7,14 +7,6 @@
 #include <clock.h>
 
 #define NTHREADS 32
-/*
-static void locktest_fail(unsigned long i, const char *message);
-static void locktest_individual(void* ignore, unsigned long i);
-static void locktest_all();
-static void initialize_cv(void);
-static void thread_cvtest(void* ignore, unsigned long i);
-static int threadJoin_send(void *ignore, unsigned long i);
-*/
 
 static struct semaphore *semaphore;
 static struct semaphore *semaphore_l;
@@ -23,28 +15,18 @@ static struct cv *cv_t1;
 
 static volatile unsigned long number_check;
 
-/*
-int asst1_tests(int i_args, char **arguments)
-{
-	KASSERT(locktest_all() == 0);
-	KASSERT(wait_cvtest(i_args, arguments) == 0);
-	KASSERT(wakeIndividual_cvtest(i_args, arguments) == 0);
-	KASSERT(wakeAll_cvtest(i_args, arguments) == 0);
-	KASSERT(threadJoin_test(i_args, arguments) == 0);
-
-	return 0;
-}
-*/
+//initializes all data structures
 static void inititems(void)
 {
+	number_check=0;
 	if (semaphore==NULL) {
-		semaphore = sem_create("testsem", 2);
+		semaphore = sem_create("testsem", 0);
 		if (semaphore == NULL) {
 			panic("synchtest: sem_create failed\n");
 		}
 	}
 	if (semaphore_l==NULL) {
-		semaphore_l = sem_create("testsem_l", 2);
+		semaphore_l = sem_create("testsem_l", 0);
 		if (semaphore_l == NULL) {
 			panic("synchtest: sem_create failed\n");
 		}
@@ -63,6 +45,39 @@ static void inititems(void)
 	}
 }
 
+static void destroyitems(void)
+{
+	if (semaphore!=NULL) {
+		sem_destroy(semaphore);
+		semaphore = NULL;
+		if (semaphore != NULL) {
+			//panic("sem_destroy failed\n");
+		}
+	}
+	if (semaphore_l!=NULL) {
+		sem_destroy(semaphore_l);
+		semaphore_l=NULL;
+		if (semaphore_l != NULL) {
+			//panic("sem_destroy for semaphore_l failed\n");
+		}
+	}
+	if (lock_t1!=NULL) {
+		lock_destroy(lock_t1);
+		lock_t1=NULL;
+		if (lock_t1 != NULL) {
+			//panic("lock_destroy failed\n");
+		}
+	}
+	if (cv_t1!=NULL) {
+		cv_destroy(cv_t1);
+		cv_t1=NULL;
+		if (cv_t1 != NULL) {
+			//panic("cv_destroy failed\n");
+		}
+	}
+}
+
+
 //////////////////
 /// Lock Tests ///
 //////////////////
@@ -72,7 +87,8 @@ static void locktest_fail(unsigned long i, const char *message)
 	kprintf("Thread %lu: %s\n", i, message);
 	kprintf("Test failed here\n");
 	lock_release(lock_t1);
-	V(semaphore_l);
+	//V(semaphore_l);
+	thread_exit();
 }
 
 //changed to void return type
@@ -100,24 +116,23 @@ static void locktest_individual(void* ignore, unsigned long i)
 	if(lock_do_i_hold(lock_t1))
 		locktest_fail(i, "this thread should not hold lock after release");
 
-	V(semaphore_l);
+	//V(semaphore_l);
 	//return 0;
 }
 
 static void locktest_all()
 {
 	int test = 0;
-	semaphore_l = sem_create("semaphore_l", 0);
 	kprintf("->Lock Tests beginning:\n");
 	//testing for 32 threads
 	for(int j=0; j < NTHREADS; j++)
 	{
-		test = thread_fork("lock_test",NULL,locktest_individual,NULL,j);
+		test = thread_fork_joinable("lock_test",NULL,locktest_individual,NULL,j);
 		if(test)
 			panic("thread_fork FAILED: %s\n", strerror(test));
 	}
 	for(int j=0; j < NTHREADS; j++)
-		P(semaphore_l);
+		thread_join();
 
 	kprintf("Lock Tests done.\n");
 	//return 0;
@@ -126,29 +141,6 @@ static void locktest_all()
 //////////////////////////////////
 /// Conditional Variable Tests ///
 //////////////////////////////////
-
-static void initialize_cv(void)
-{
-	number_check=0;
-	if(lock_t1==NULL)
-	{
-		lock_t1 = lock_create("test_l");
-		if(lock_t1==NULL)
-			panic("lock_create() FAILED\n");
-	}
-	if(semaphore==NULL)
-	{
-		semaphore=sem_create("semaphore_test",0);
-		if(semaphore==NULL)
-			panic("sem_create() FAILED\n");
-	}
-	if(cv_t1==NULL)
-	{
-		cv_t1 = cv_create("test_cv");
-		if(cv_t1 == NULL)
-			panic("cv_create() FAILED\n");
-	}
-}
 
 static void thread_cvtest(void* ignore, unsigned long i)
 {
@@ -161,17 +153,16 @@ static void thread_cvtest(void* ignore, unsigned long i)
 	}
 	V(semaphore);
 	lock_release(lock_t1);
-
 }
 
 void wait_cvtest(int i_args, char **arguments)
 {
 	(void)arguments;
 	(void)i_args;
-	initialize_cv();
+	
 	kprintf("->Beginning wait_cvtest:\n");
 	int test = 0;
-	test = thread_fork("test_cv",NULL,thread_cvtest, NULL, 1);
+	test = thread_fork_joinable("test_cv",NULL,thread_cvtest, NULL, 1);
 	if(test)
 		panic("thread_fork %s failed during cv_test\n", strerror(test));
 	P(semaphore);
@@ -180,6 +171,7 @@ void wait_cvtest(int i_args, char **arguments)
 	cv_signal(cv_t1, lock_t1);
 	lock_release(lock_t1);
 	P(semaphore);
+	thread_join();
 	kprintf("->Ending wait_cvtest\n");
 }
 
@@ -188,13 +180,14 @@ void wakeIndividual_cvtest(int i_args, char **arguments)
 	int test;
 	(void)i_args;
 	(void)arguments;
-	initialize_cv();
+	//initialize_cv();
+	//added this above
 	kprintf("->Starting wakeIndividual_cvtest:\n");
 
 	//creates threads that wait for number_check to be 1
 	for(int j=0; j<2; j++)
 	{
-		test = thread_fork("test_cv", NULL, thread_cvtest, NULL, 1);
+		test = thread_fork_joinable("test_cv", NULL, thread_cvtest, NULL, 1);
 		if(test)
 			panic("thread_fork %s failed during cvtest\n",strerror(test));
 		P(semaphore);
@@ -209,6 +202,11 @@ void wakeIndividual_cvtest(int i_args, char **arguments)
 		P(semaphore);
 	}
 
+	for(int j=0; j<2; j++)
+	{
+		thread_join();
+	}
+
 	kprintf("->Ending wakeIndividual_cvtest:\n");
 }
 
@@ -217,13 +215,13 @@ void wakeAll_cvtest(int i_args, char **arguments)
 	int test;
         (void)i_args;
         (void)arguments;
-        initialize_cv();
+        
         kprintf("->Starting wakeAll_cvtest:\n");
 
         //creates threads that wait for number_check to be 1
         for(int j=0; j<2; j++)
         {
-		test = thread_fork("test_cv", NULL, thread_cvtest, NULL, 1);
+		test = thread_fork_joinable("test_cv", NULL, thread_cvtest, NULL, 1);
                 if(test)
                         panic("thread_fork %s failed during cvtest\n",strerror(test));
                 P(semaphore);
@@ -232,7 +230,7 @@ void wakeAll_cvtest(int i_args, char **arguments)
 	//creates threads that wait for number_check to be 2
         for(int j=0; j<2; j++)
         {
-		test = thread_fork("test_cv", NULL, thread_cvtest, NULL, 2);
+		test = thread_fork_joinable("test_cv", NULL, thread_cvtest, NULL, 2);
                 if(test)
                         panic("thread_fork %s failed during cvtest\n",strerror(test));
                 P(semaphore);
@@ -248,6 +246,11 @@ void wakeAll_cvtest(int i_args, char **arguments)
                 P(semaphore);
 		P(semaphore);
         }
+
+	for(int j=0; j<4;j++)
+	{
+		thread_join();
+	}
 
 	kprintf("->Ending wakeAll_cvtest:\n");
 }
@@ -296,9 +299,10 @@ int asst1_tests(int i_args, char **arguments)
 	inititems();
         locktest_all();
         wait_cvtest(i_args, arguments);
-        wakeIndividual_cvtest(i_args, arguments);
+        //wakeIndividual_cvtest(i_args, arguments);
         wakeAll_cvtest(i_args, arguments);
         threadJoin_test(i_args, arguments);
+	destroyitems();
 	return 0;
 }
 
