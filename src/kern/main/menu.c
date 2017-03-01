@@ -510,6 +510,7 @@ static const char *testmenu[] = {
 	"[fs4] FS write stress 2             ",
 	"[fs5] FS long stress                ",
 	"[fs6] FS create stress              ",
+	"[a1a] Assignment 1 tests	     ",
 	NULL
 };
 
@@ -612,6 +613,7 @@ static struct {
 	{ "sy2",	locktest },
 	{ "sy3",	cvtest },
 	{ "sy4",	cvtest2 },
+	{ "a1a",	asst1_tests },
 #if OPT_SYNCHPROBS
     { "sp1",    elves },
     { "sp2",    airballoon },

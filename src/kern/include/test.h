@@ -58,6 +58,10 @@ int semtest(int, char **);
 int locktest(int, char **);
 int cvtest(int, char **);
 int cvtest2(int, char **);
+void wait_cvtest(int i_args, char **arguments);
+void wakeIndividual_cvtest(int i_args, char **arguments);
+void wakeAll_cvtest(int i_args, char **arguments);
+void threadJoin_test(int i_args, char **arguments);
 
 /* semaphore unit tests */
 int semu1(int, char **);
@@ -98,6 +102,7 @@ int kmallocstress(int, char **);
 int kmalloctest3(int, char **);
 int kmalloctest4(int, char **);
 int nettest(int, char **);
+int asst1_tests(int i_args, char **arguments);
 
 /* Routine for running a user-level program. */
 int runprogram(char *progname);
