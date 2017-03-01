@@ -35,6 +35,33 @@ int asst1_tests(int i_args, char **arguments)
 	return 0;
 }
 */
+static void inititems(void)
+{
+	if (semaphore==NULL) {
+		semaphore = sem_create("testsem", 2);
+		if (semaphore == NULL) {
+			panic("synchtest: sem_create failed\n");
+		}
+	}
+	if (semaphore_l==NULL) {
+		semaphore_l = sem_create("testsem_l", 2);
+		if (semaphore_l == NULL) {
+			panic("synchtest: sem_create failed\n");
+		}
+	}
+	if (lock_t1==NULL) {
+		lock_t1 = lock_create("testlock");
+		if (lock_t1 == NULL) {
+			panic("synchtest: lock_create failed\n");
+		}
+	}
+	if (cv_t1==NULL) {
+		cv_t1 = cv_create("cvtest");
+		if (cv_t1 == NULL) {
+			panic("synchtest: cv_create failed\n");
+		}
+	}
+}
 
 //////////////////
 /// Lock Tests ///
@@ -52,7 +79,6 @@ static void locktest_fail(unsigned long i, const char *message)
 static void locktest_individual(void* ignore, unsigned long i)
 {
 	(void)ignore;
-
 	//checks if lock test is holding lock at start
 	if(lock_do_i_hold(lock_t1))
 		locktest_fail(i, "lock should not be be held by this thread at start");
@@ -267,6 +293,7 @@ void threadJoin_test(int i_args, char **arguments)
 
 int asst1_tests(int i_args, char **arguments)
 {
+	inititems();
         locktest_all();
         wait_cvtest(i_args, arguments);
         wakeIndividual_cvtest(i_args, arguments);
