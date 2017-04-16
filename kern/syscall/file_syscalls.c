@@ -29,22 +29,42 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 {
 	const int allflags = O_ACCMODE | O_CREAT | O_EXCL | O_TRUNC | O_APPEND | O_NOCTTY;
 
-	char *kpath;
-	struct openfile *file;
+	char *kpath = NULL;
+	struct openfile *file = NULL;
 	int result = 0;
 
-	/* 
-	 * Your implementation of system call open starts here.  
-	 *
-	 * Check the design document design/filesyscall.txt for the steps
-	 */
-	(void) upath; // suppress compilation warning until code gets written
-	(void) flags; // suppress compilation warning until code gets written
-	(void) mode; // suppress compilation warning until code gets written
-	(void) retval; // suppress compilation warning until code gets written
-	(void) allflags; // suppress compilation warning until code gets written
-	(void) kpath; // suppress compilation warning until code gets written
-	(void) file; // suppress compilation warning until code gets written
+	// 1. Check for invalid flags
+	if (allflags != (allflags | flags) )
+		return EINVAL;
+	
+	// 2. Copy in supplied file name
+	size_t *actual = NULL;
+	size_t len = strlen((char*)upath);
+	
+	//int ret = copyinstr(upath, kpath, len, actual);
+	
+	if (copyinstr(upath, kpath, len, actual) == EFAULT)
+		return EFAULT;
+	
+	// 3. Open the file
+
+	//int err = openfile_open(dest, flags, mode, &file);
+	
+	if (openfile_open(kpath, flags, mode, &file) == ENOMEM)
+		return ENOMEM;
+
+	openfile_incref(file);
+	
+	int * fd_ret = NULL;
+	
+	// 4. Place the file in curproc's file table
+	
+	//int ret_f = filetable_place(curproc->p_filetable, file, fd_ret);
+	
+	if (filetable_place(curproc->p_filetable, file, fd_ret) == EMFILE)
+		return EMFILE;
+	
+	*retval = *fd_ret;
 
 	return result;
 }
