@@ -1,0 +1,8 @@
+#ignore all tools and stuff
+./tools/*
+./toolbuild/*
+./root/*
+./src/kern/compile/ASST1/*
+./src/kern/compile/DUMBVM/*
+./src/build/*
+./src/defs.mk
