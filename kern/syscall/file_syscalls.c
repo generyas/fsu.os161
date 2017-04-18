@@ -34,8 +34,10 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	int result = 0;
 
 	// 1. Check for invalid flags
-	if (allflags != (allflags | flags) )
-		return EINVAL;
+	if (allflags != (allflags | flags) ){
+		errno = EINVAL;
+		return -1;
+	}
 	
 	// 2. Copy in supplied file name
 	size_t *actual = NULL;
@@ -43,15 +45,18 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	
 	//int ret = copyinstr(upath, kpath, len, actual);
 	
-	if (copyinstr(upath, kpath, len, actual) == EFAULT)
-		return EFAULT;
-	
+	if (copyinstr(upath, kpath, len, actual) == EFAULT){
+		errno = EFAULT;
+		return -1;
+	}
 	// 3. Open the file
 
 	//int err = openfile_open(dest, flags, mode, &file);
 	
-	if (openfile_open(kpath, flags, mode, &file) == ENOMEM)
-		return ENOMEM;
+	if (openfile_open(kpath, flags, mode, &file) == ENOMEM){
+		errno = ENOMEM;
+		return -1;
+	}
 
 	openfile_incref(file);
 	
@@ -61,8 +66,10 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	
 	//int ret_f = filetable_place(curproc->p_filetable, file, fd_ret);
 	
-	if (filetable_place(curproc->p_filetable, file, fd_ret) == EMFILE)
-		return EMFILE;
+	if (filetable_place(curproc->p_filetable, file, fd_ret) == EMFILE){
+		errno = EMFILE;
+		return -1;
+	}
 	
 	*retval = *fd_ret;
 
@@ -80,8 +87,10 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	// 1. Translate the file descriptor number to an open file object
 	struct openfile * file;
 
-	if(EBADF == filetable_get(curproc->p_filetable, fd, &file))
-		return EBADF;
+	if(EBADF == filetable_get(curproc->p_filetable, fd, &file)){
+		errno = EBADF;
+		return -1;
+	}
 
 	// 2. lock the seek position in the open file
 	
@@ -91,8 +100,10 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 		file->of_offset;
 
 	// 3. check for files opened write-only 
-	if (file->of_accmode != O_WRONLY)
-		return EBADF;
+	if (file->of_accmode != O_WRONLY){
+		errno = EBADF;
+		return -1;	
+	}
 
 	// 4. cons up a uio
 	struct iovec iov;
@@ -113,6 +124,8 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	result = VOP_READ(file->of_vnode, &u);
 
 	// 6. update the seek position afterwards
+	
+	int success = lseek(fd, size, SEEK_CUR);
 
 	// 7. unlock and filetable_put()
 	if (seekable != -1)
