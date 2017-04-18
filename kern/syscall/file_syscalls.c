@@ -116,7 +116,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	u.uio_offset = file->of_offset;
 	u.uio_segflg = UIO_USERSPACE;
 	u.uio_rw = UIO_READ;
-	u.uio_space = as;            // DON'T know how to get addr space
+	u.uio_space = curproc->p_addrspace;            // DON'T know how to get addr space
 
 	
 	// 5. call VOP_READ	
