@@ -131,6 +131,33 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 /*
  * close() - remove from the file table.
  */
+int
+sys_close(struct filetable *ft, int fd)
+{
+	int result = 0;
+	struct openfile * file;
+
+	//1. validate the fd number (use filetable_okfd)
+	if(!filetable_okfd(ft, fd))
+	{
+		errno = EBADF;
+		return(-1);
+	}
+	//2. use filetable_placeat to replace curproc's file table 
+	//	entry with NULL.
+	filetable_placeat(ft, NULL, fd, file);
+
+	//3. check if the previous entry in the file table was also NULL
+	//	(this means no such file was open)
+	if(!(filetable_get(ft, fd, &file))==EBADF)
+	{
+		errno = EBADF;
+		return(-1);
+	}
+	
+	//4. decref the open file returned by filetable_placeat
+	openfile_decref(file);
+}
 
 /* 
 * encrypt() - read and encrypt the data of a file
