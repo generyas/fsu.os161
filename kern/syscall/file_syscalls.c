@@ -51,20 +51,28 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	}
 	// 3. Open the file
 
-	//int err = openfile_open(dest, flags, mode, &file);
+	int err = openfile_open(dest, flags, mode, &file);
 	
-	if (openfile_open(kpath, flags, mode, &file) == ENOMEM){
-		errno = ENOMEM;
+	if (err == ENOMEM  ||  // ENOMEM: openfile_open -> ENOMEM
+	    err == ENODEV  ||  // ENODEV: vfs_open -> vfs_lookparent -> getdevice -> vfs_getroot -> ENODEV
+            err == ENOTDIR ||  // We assume this error gets check here
+	    err == ENOENT  ||  // ENOENT: vfs_open -> vfs_lookparent -> getdevice -> ENOENT
+	    err == EISDIR  ||  // We assume this error gets check here
+	    err == ENFILE  ||  // We assume this error gets check here
+	    err == ENXIO   ||  // ENXIO: vfs_open -> vfs_lookparent -> getdevice -> vfs_getroot -> ENXIO
+	    err == ENOSPC){    // We assume this error gets check here
+		errno = err;
 		return -1;
 	}
 
+
 	openfile_incref(file);
-	
-	int * fd_ret = NULL;
 	
 	// 4. Place the file in curproc's file table
 	
 	//int ret_f = filetable_place(curproc->p_filetable, file, fd_ret);
+
+	int * fd_ret = NULL;
 	
 	if (filetable_place(curproc->p_filetable, file, fd_ret) == EMFILE){
 		errno = EMFILE;
@@ -116,7 +124,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	u.uio_offset = file->of_offset;
 	u.uio_segflg = UIO_USERSPACE;
 	u.uio_rw = UIO_READ;
-	u.uio_space = curproc->p_addrspace;            // DON'T know how to get addr space
+	u.uio_space = curproc->p_addrspace;
 
 	
 	// 5. call VOP_READ	
