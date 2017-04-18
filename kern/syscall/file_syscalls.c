@@ -97,7 +97,6 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	int seekable = lseek(fd, 0, SEEK_CUR);
 	if (seekable != -1) // Check if seekable
 		spinlock_acquire(&file->of_offsetlock);
-		file->of_offset;
 
 	// 3. check for files opened write-only 
 	if (file->of_accmode != O_WRONLY){
@@ -109,20 +108,22 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	struct iovec iov;
 	struct uio u;	
 	
-	iov.iov_ubase = buf;
+	iov.iov_ubase = buf;         // here is where we use buff 
 	iov.iov_len = size;          // length that we will read
 	u.uio_iov = &iov;
 	u.uio_iovcnt = 1;
 	u.uio_resid = size;          // amount to read from the file
-	u.uio_offset = offset;
+	u.uio_offset = file->of_offset;
 	u.uio_segflg = UIO_USERSPACE;
 	u.uio_rw = UIO_READ;
 	u.uio_space = as;            // DON'T know how to get addr space
 
 	
 	// 5. call VOP_READ	
-	result = VOP_READ(file->of_vnode, &u);
-
+	int vop_ret = VOP_READ(file->of_vnode, &u);
+	
+	result = u.uio_offset // setting result to amount of bits read
+ 
 	// 6. update the seek position afterwards
 	
 	int success = lseek(fd, size, SEEK_CUR);
