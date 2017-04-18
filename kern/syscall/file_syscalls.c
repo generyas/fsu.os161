@@ -162,7 +162,7 @@ sys_close(struct filetable *ft, int fd)
 
 	//3. check if the previous entry in the file table was also NULL
 	//	(this means no such file was open)
-	if(!(filetable_get(ft, fd, &file))==EBADF)
+	if((filetable_get(ft, fd, &file))==EBADF)
 	{
 		errno = EBADF;
 		return(-1);
