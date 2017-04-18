@@ -53,6 +53,9 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 
 	int err = openfile_open(dest, flags, mode, &file);
 	
+	
+	//Possible alternative is to check if err != 0 and return err. Need to discuss with group
+		
 	if (err == ENOMEM  ||  // ENOMEM: openfile_open -> ENOMEM
 	    err == ENODEV  ||  // ENODEV: vfs_open -> vfs_lookparent -> getdevice -> vfs_getroot -> ENODEV
             err == ENOTDIR ||  // We assume this error gets check here
@@ -60,7 +63,9 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	    err == EISDIR  ||  // We assume this error gets check here
 	    err == ENFILE  ||  // We assume this error gets check here
 	    err == ENXIO   ||  // ENXIO: vfs_open -> vfs_lookparent -> getdevice -> vfs_getroot -> ENXIO
-	    err == ENOSPC){    // We assume this error gets check here
+	    err == ENOSPC  ||  // We assume this error gets check here
+	    err == EIO)        // We assume this error gets check here
+)	{   
 		errno = err;
 		return -1;
 	}
