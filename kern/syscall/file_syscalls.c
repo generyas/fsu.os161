@@ -21,7 +21,7 @@
 #include <syscall.h>
 
 //TEMP
-extern int errno;
+int err;
 
 /*
  * open() - get the path with copyinstr, then use openfile_open and
@@ -38,7 +38,7 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 
 	// 1. Check for invalid flags
 	if (allflags != (allflags | flags) ){
-		errno = EINVAL;
+		//errno = EINVAL;
 		return -1;
 	}
 	
@@ -49,7 +49,7 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	//int ret = copyinstr(upath, kpath, len, actual);
 	
 	if (copyinstr(upath, kpath, len, actual) == EFAULT){
-		errno = EFAULT;
+		//errno = EFAULT;
 		return -1;
 	}
 	// 3. Open the file
@@ -59,18 +59,10 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	
 	//Possible alternative is to check if err != 0 and return err. Need to discuss with group
 		
-	if (err == ENOMEM  ||  // ENOMEM: openfile_open -> ENOMEM
-	    err == ENODEV  ||  // ENODEV: vfs_open -> vfs_lookparent -> getdevice -> vfs_getroot -> ENODEV
-        err == ENOTDIR ||  // We assume this error gets check here
-	    err == ENOENT  ||  // ENOENT: vfs_open -> vfs_lookparent -> getdevice -> ENOENT
-	    err == EISDIR  ||  // We assume this error gets check here
-	    err == ENFILE  ||  // We assume this error gets check here
-	    err == ENXIO   ||  // ENXIO: vfs_open -> vfs_lookparent -> getdevice -> vfs_getroot -> ENXIO
-	    err == ENOSPC  ||  // We assume this error gets check here
-	    err == EIO)        // We assume this error gets check here
+	if (err)        // We assume this error gets check here
 	{   
-		errno = err;
-		return -1;
+		*retval = -1;
+		return err;
 	}
 
 
@@ -83,7 +75,7 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	int * fd_ret = NULL;
 	
 	if (filetable_place(curproc->p_filetable, file, fd_ret) == EMFILE){
-		errno = EMFILE;
+		//errno = EMFILE;
 		return -1;
 	}
 	
@@ -105,7 +97,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	struct openfile * file;
 
 	if(EBADF == filetable_get(curproc->p_filetable, fd, &file)){
-		errno = EBADF;
+		//errno = EBADF;
 		return -1;
 	}
 
@@ -119,7 +111,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 
 	// 3. check for files opened write-only 
 	if (file->of_accmode != O_WRONLY){
-		errno = EBADF;
+		//errno = EBADF;
 		return -1;	
 	}
 
@@ -170,7 +162,8 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
     //  (use filetable_get)
 	struct openfile* file;
 
-    if ((errno = filetable_get(curproc->p_filetable, fd, &file)))
+	int err;
+    if ((err = filetable_get(curproc->p_filetable, fd, &file)))
 		return -1;
     
     // lock the seek position in the open file (but only for seekable
@@ -185,7 +178,7 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
     // check for files opened read-only
 	if (file->of_accmode != O_RDONLY)
     {
-		errno = EBADF;
+		//errno = EBADF;
 		return -1;	
 	}
 
@@ -224,28 +217,29 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
  * close() - remove from the file table.
  */
 int
-sys_close(struct filetable *ft, int fd)
+sys_close(int fd, int *retval)
 {
 	int result = 0;
-    (void) result;
-    (void) ft;
+	(void)result;
+	(void)retval;	
+	retval = NULL;
 	struct openfile * file;
 
 	//1. validate the fd number (use filetable_okfd)
-	if(!filetable_okfd(ft, fd))
+	if(!filetable_okfd(curproc->p_filetable, fd))
 	{
-		errno = EBADF;
+		//errno = EBADF;
 		return(-1);
 	}
 	//2. use filetable_placeat to replace curproc's file table 
 	//	entry with NULL.
-	filetable_placeat(ft, NULL, fd, &file);
+	filetable_placeat(curproc->p_filetable, NULL, fd, &file);
 
 	//3. check if the previous entry in the file table was also NULL
 	//	(this means no such file was open)
-	if((filetable_get(ft, fd, &file))==EBADF)
+	if((filetable_get(curproc->p_filetable, fd, &file))==EBADF)
 	{
-		errno = EBADF;
+		//errno = EBADF;
 		return(-1);
 	}
 	
