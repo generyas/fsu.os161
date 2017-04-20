@@ -85,64 +85,57 @@ int
 sys_read(int fd, userptr_t buf, size_t size, int *retval)
 {
     int result = 0;
-    (void) result;
 
 	// 1. Translate the file descriptor number to an open file object
+
 	struct openfile * file;
 
-	if(EBADF == filetable_get(curproc->p_filetable, fd, &file)){
-		//errno = EBADF;
-		return -1;
+	if( (err = filetable_get(curproc->p_filetable, fd, &file)) ){
+		*retval = -1;
+		return err;
 	}
 
 	// 2. lock the seek position in the open file
 	
 	int seekable = VOP_ISSEEKABLE(file->of_vnode);
     
-	if (seekable != -1) // Check if seekable
+	if (seekable) // Check if seekable
 		lock_acquire(file->of_offsetlock);
 
-	// 3. check for files opened write-only 
+	// 3. check for files opened write-only
+
 	if (file->of_accmode != O_WRONLY){
-		//errno = EBADF;
-		return -1;	
+		*retval = -1;
+		return EBADF;	
 	}
 
 	// 4. cons up a uio
+
 	struct iovec iov;
 	struct uio u;
 	
 	uio_kinit(&iov, &u, buf, size, file->of_offset, UIO_READ);
 	
-    //Use uio_kinit()
-    /*
-	iov.iov_ubase = buf;         // here is where we use buff 
-	iov.iov_len = size;          // length that we will read
-	u.uio_iov = &iov;
-	u.uio_iovcnt = 1;
-	u.uio_resid = size;          // amount to read from the file
-	u.uio_offset = file->of_offset;
-	u.uio_segflg = UIO_USERSPACE;
-	u.uio_rw = UIO_READ;
-	u.uio_space = curproc->p_addrspace;
-    */
+	// 5. call VOP_READ
 	
-	// 5. call VOP_READ	
-	int vop_ret = VOP_READ(file->of_vnode, &u);
-    (void) vop_ret;
+	if( (err = VOP_READ(file->of_vnode, &u)) ){
+		*retval = -1;
+		return err;
+	}
 	
-	result = u.uio_offset; // setting result to amount of bits read
+	*retval = u.uio_offset; // setting result to amount of bits read
+
 	// 6. update the seek position afterwards
 	
 	//int success = lseek(fd, size, SEEK_CUR);
 
 	// 7. unlock and filetable_put()
-	if (seekable != -1)
-		lock_acquire(file->of_offsetlock);
+
+	if (seekable)
+		lock_release(file->of_offsetlock);
 	
 	filetable_put(curproc->p_filetable, fd, file);
  
-    (void) retval;
     return result;
 }
 
