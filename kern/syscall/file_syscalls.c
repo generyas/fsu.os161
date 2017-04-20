@@ -39,7 +39,7 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	// 1. Check for invalid flags
 	
 	if (allflags != (allflags | flags) ){
-		*retval = -1;
+		*retval = EINVAL;
 		return EINVAL;
 	}
 	
@@ -57,7 +57,7 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 
 	int err = openfile_open(kpath, flags, mode, &file);
 	
-	if (err){   
+	if (err){
 		*retval = -1;
 		return err;
 	}
@@ -235,6 +235,10 @@ sys_close(int fd, int *retval)
     return result;
 }
 
-/* 
-* encrypt() - read and encrypt the data of a file
-*/
+int
+sys_encrypt(int fd, int *retval)
+{
+	(void)fd;
+	(void)retval;
+	return 0;
+}
