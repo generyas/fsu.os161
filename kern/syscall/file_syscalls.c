@@ -21,7 +21,7 @@
 #include <syscall.h>
 
 //TEMP
-int err;
+static int err;
 
 /*
  * open() - get the path with copyinstr, then use openfile_open and
@@ -48,9 +48,9 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	size_t *actual = NULL;
 	size_t len = strlen((char*)upath);
 	
-	if (copyinstr(upath, kpath, len, actual) == EFAULT){
+	if ( (err = copyinstr(upath, kpath, len, actual)) ){
 		*retval = -1;
-		return EFAULT;
+		return err;
 	}
 
 	// 3. Open the file
@@ -68,9 +68,9 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 
 	int * fd_ret = NULL;
 	
-	if (filetable_place(curproc->p_filetable, file, fd_ret) == EMFILE){
+	if ( (err = filetable_place(curproc->p_filetable, file, fd_ret)) ){
 		*retval = -1;
-		return EMFILE;
+		return err;
 	}
 	
 	*retval = *fd_ret;
@@ -214,34 +214,35 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
 int
 sys_close(int fd, int *retval)
 {
-	int result = 0;
-	(void)result;
-	(void)retval;	
+	int result = 0;	
 	retval = NULL;
 	struct openfile * file;
 
-	//1. validate the fd number (use filetable_okfd)
-	if(!filetable_okfd(curproc->p_filetable, fd))
+	// 1. validate the fd number (use filetable_okfd)
+
+	if( (err = filetable_okfd(curproc->p_filetable, fd)) )
 	{
-		//errno = EBADF;
-		return(-1);
+		*retval = -1;
+		return err;
 	}
-	//2. use filetable_placeat to replace curproc's file table 
-	//	entry with NULL.
+	// 2. use filetable_placeat to replace curproc's file table... entry with NULL.
+
 	filetable_placeat(curproc->p_filetable, NULL, fd, &file);
 
-	//3. check if the previous entry in the file table was also NULL
-	//	(this means no such file was open)
-	if((filetable_get(curproc->p_filetable, fd, &file))==EBADF)
+	// 3. check if the previous entry in the file table was also NULL... (this means no such file was open)
+
+	if( (err = filetable_get(curproc->p_filetable, fd, &file)) )
 	{
-		//errno = EBADF;
-		return(-1);
+		*retval = -1;
+		return err;
 	}
 	
-	//4. decref the open file returned by filetable_placeat
+	// 4. decref the open file returned by filetable_placeat
+
 	openfile_decref(file);
-    
-    return 0;
+
+    *retval = 0;
+    return result;
 }
 
 /* 
