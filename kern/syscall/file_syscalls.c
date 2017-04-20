@@ -37,46 +37,40 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	int result = 0;
 
 	// 1. Check for invalid flags
+	
 	if (allflags != (allflags | flags) ){
-		//errno = EINVAL;
-		return -1;
+		*retval = -1;
+		return EINVAL;
 	}
 	
 	// 2. Copy in supplied file name
+
 	size_t *actual = NULL;
 	size_t len = strlen((char*)upath);
 	
-	//int ret = copyinstr(upath, kpath, len, actual);
-	
 	if (copyinstr(upath, kpath, len, actual) == EFAULT){
-		//errno = EFAULT;
-		return -1;
+		*retval = -1;
+		return EFAULT;
 	}
+
 	// 3. Open the file
 
 	int err = openfile_open(kpath, flags, mode, &file);
 	
-	
-	//Possible alternative is to check if err != 0 and return err. Need to discuss with group
-		
-	if (err)        // We assume this error gets check here
-	{   
+	if (err){   
 		*retval = -1;
 		return err;
 	}
 
-
 	openfile_incref(file);
 	
 	// 4. Place the file in curproc's file table
-	
-	//int ret_f = filetable_place(curproc->p_filetable, file, fd_ret);
 
 	int * fd_ret = NULL;
 	
 	if (filetable_place(curproc->p_filetable, file, fd_ret) == EMFILE){
-		//errno = EMFILE;
-		return -1;
+		*retval = -1;
+		return EMFILE;
 	}
 	
 	*retval = *fd_ret;
