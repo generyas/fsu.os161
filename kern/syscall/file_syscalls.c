@@ -103,8 +103,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 
 	// 2. lock the seek position in the open file
 	
-	//int seekable = lseek(fd, 0, SEEK_CUR);
-    int seekable = 0;
+	int seekable = VOP_ISSEEKABLE(file->of_vnode);
     
 	if (seekable != -1) // Check if seekable
 		lock_acquire(file->of_offsetlock);
@@ -117,10 +116,12 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 
 	// 4. cons up a uio
 	struct iovec iov;
-	struct uio u;	
+	struct uio u;
+	
+	uio_kinit(&iov, &u, buf, size, file->of_offset, UIO_READ);
 	
     //Use uio_kinit()
-    
+    /*
 	iov.iov_ubase = buf;         // here is where we use buff 
 	iov.iov_len = size;          // length that we will read
 	u.uio_iov = &iov;
@@ -130,7 +131,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 	u.uio_segflg = UIO_USERSPACE;
 	u.uio_rw = UIO_READ;
 	u.uio_space = curproc->p_addrspace;
-
+    */
 	
 	// 5. call VOP_READ	
 	int vop_ret = VOP_READ(file->of_vnode, &u);
@@ -170,7 +171,7 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
     //  objects)
     //Questions? (lseek)
     //int can_seek = lseek(fd, 0, SEEK_CUR);
-    int can_seek = 0;
+    int can_seek = VOP_ISSEEKABLE(file->of_vnode);
     
 	if (can_seek != -1)
 		lock_acquire(file->of_offsetlock);
