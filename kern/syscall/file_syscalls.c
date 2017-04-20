@@ -146,56 +146,53 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 int
 sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
 {
-    // translate the file descriptor number to an open file object
-    //  (use filetable_get)
+	// translate the file descriptor number to an open file object
+	//  (use filetable_get)
 	struct openfile* file;
 
-	int err;
-    if ((err = filetable_get(curproc->p_filetable, fd, &file)))
+	if ( (err = filetable_get(curproc->p_filetable, fd, &file)) ){
+		*retval = err;
 		return -1;
+	}
     
-    // lock the seek position in the open file (but only for seekable
-    //  objects)
-    //Questions? (lseek)
-    //int can_seek = lseek(fd, 0, SEEK_CUR);
-    int can_seek = VOP_ISSEEKABLE(file->of_vnode);
+	// lock the seek position in the open file (but only for seekable
+	//  objects)
+
+	int can_seek = VOP_ISSEEKABLE(file->of_vnode);
     
-	if (can_seek != -1)
+	if (can_seek)
 		lock_acquire(file->of_offsetlock);
     
-    // check for files opened read-only
-	if (file->of_accmode != O_RDONLY)
-    {
-		//errno = EBADF;
-		return -1;	
+	// check for files opened read-only
+
+	if (file->of_accmode != O_RDONLY){
+		*retval = -1;
+		return EBADF;	
 	}
 
-    // cons up a uio
-    
+	// cons up a uio    
     
 	struct iovec iov;
 	struct uio u;
-    uio_kinit(&iov, &u, buf, nbytes, file->of_offset, UIO_WRITE);
+	uio_kinit(&iov, &u, buf, nbytes, file->of_offset, UIO_WRITE);
     
-    // call VOP_WRITE
+    	VOP_WRITE(file->of_vnode, &u);
     
-    //Questions? (VOP_WRITE)
-    VOP_WRITE(file->of_vnode, &u);
+	// update the seek position afterwards
     
-    // update the seek position afterwards
+	/*if (can_seek != -1) {
+		if ((errno = lseek(fd, nbytes, SEEK_CUR)))
+			return -1;
+	}*/
     
-    /*if (can_seek != -1) {
-        if ((errno = lseek(fd, nbytes, SEEK_CUR)))
-            return -1;
-    }*/
-    
-    // unlock and filetable_put()
-	if (can_seek != -1)
+	// unlock and filetable_put()
+	if (can_seek)
 		lock_release(file->of_offsetlock);
 	
 	filetable_put(curproc->p_filetable, fd, file);
     
-    // set the return value correctl
+	// set the return value correctly
+
     *retval = u.uio_offset;
     return 0;
 }
