@@ -46,6 +46,7 @@
 int
 main(int argc, char *argv[])
 {
+	//printf("asjdnakjsdnakjdn");
 	static char writebuf[40] = "Twiddle dee dee, Twiddle dum dum.......\n";
 	static char readbuf[41];
 
@@ -64,6 +65,7 @@ main(int argc, char *argv[])
 	}
 
 	fd = open(file, O_WRONLY|O_CREAT|O_TRUNC, 0664);
+
 	if (fd<0) {
 		err(1, "%s: open for write", file);
 	}

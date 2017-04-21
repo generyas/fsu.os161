@@ -49,7 +49,7 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	size_t len = strlen((char*)upath);
 
 	actual = (size_t *)kmalloc(sizeof(size_t));
-	kpath = (char *)kmalloc(len);
+	kpath = (char *)kmalloc(sizeof(char) * len);
 	
 	if ( (err = copyinstr(upath, kpath, len, actual)) ){
 		*retval = -1;

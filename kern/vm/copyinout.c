@@ -276,6 +276,7 @@ copyinstr(const_userptr_t usersrc, char *dest, size_t len, size_t *actual)
 	curthread->t_machdep.tm_badfaultfunc = copyfail;
 
 	result = setjmp(curthread->t_machdep.tm_copyjmp);
+
 	if (result) {
 		curthread->t_machdep.tm_badfaultfunc = NULL;
 		return EFAULT;

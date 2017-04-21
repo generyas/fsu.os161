@@ -68,6 +68,8 @@ setjmp:
 
    j ra			/* done */
    li v0, 0		/* return 0 (in delay slot) */
+
+
    .end setjmp
 
 

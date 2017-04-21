@@ -18,10 +18,10 @@ bmake install
 
 # configure kernel with the sample DUMBVM configuration
 cd kern/conf/
-./config DUMBVM
+./config ASST2
 
 # compile kernel with the DUMBVM configuration
-cd ../compile/DUMBVM
+cd ../compile/ASST2
 bmake depend
 bmake 
 bmake install
