@@ -39,7 +39,7 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	// 1. Check for invalid flags
 	
 	if (allflags != (allflags | flags) ){
-		*retval = EINVAL;
+		*retval = -1;
 		return EINVAL;
 	}
 	
@@ -47,6 +47,9 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 
 	size_t *actual = NULL;
 	size_t len = strlen((char*)upath);
+
+	actual = (size_t *)kmalloc(sizeof(size_t));
+	kpath = (char *)kmalloc(len);
 	
 	if ( (err = copyinstr(upath, kpath, len, actual)) ){
 		*retval = -1;
@@ -54,10 +57,10 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	}
 
 	// 3. Open the file
-
-	int err = openfile_open(kpath, flags, mode, &file);
 	
-	if (err){
+	file = (struct openfile *)kmalloc(sizeof(struct openfile));
+	
+	if ( (err = openfile_open(kpath, flags, mode, &file)) ){
 		*retval = -1;
 		return err;
 	}
@@ -68,12 +71,16 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 
 	int * fd_ret = NULL;
 	
+	fd_ret = (int *)kmalloc(sizeof(int));
+	
 	if ( (err = filetable_place(curproc->p_filetable, file, fd_ret)) ){
 		*retval = -1;
 		return err;
 	}
 	
 	*retval = *fd_ret;
+	
+	kfree(kpath);
 
 	return result;
 }
@@ -127,7 +134,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 
 	// 6. update the seek position afterwards
 	
-	//int success = lseek(fd, size, SEEK_CUR);
+	file->of_offset += u.uio_offset;
 
 	// 7. unlock and filetable_put()
 
@@ -165,7 +172,7 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
     
 	// check for files opened read-only
 
-	if (file->of_accmode != O_RDONLY){
+	if (file->of_accmode == O_RDONLY){
 		*retval = -1;
 		return EBADF;	
 	}
@@ -180,11 +187,8 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
     
 	// update the seek position afterwards
     
-	/*if (can_seek != -1) {
-		if ((errno = lseek(fd, nbytes, SEEK_CUR)))
-			return -1;
-	}*/
-    
+	file->of_offset += u.uio_offset;
+
 	// unlock and filetable_put()
 	if (can_seek)
 		lock_release(file->of_offsetlock);
