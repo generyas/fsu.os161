@@ -46,10 +46,10 @@ sys_open(const_userptr_t upath, int flags, mode_t mode, int *retval)
 	// 2. Copy in supplied file name
 
 	size_t *actual = NULL;
-	size_t len = strlen((char*)upath);
+	size_t len = strlen((char*)upath) + 1;
 
 	actual = (size_t *)kmalloc(sizeof(size_t));
-	kpath = (char *)kmalloc(sizeof(char) * len);
+	kpath = (char *)kmalloc(sizeof(char) * (len));
 	
 	if ( (err = copyinstr(upath, kpath, len, actual)) ){
 		*retval = -1;
@@ -112,7 +112,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 
 	// 3. check for files opened write-only
 
-	if (file->of_accmode != O_WRONLY){
+	if (file->of_accmode == O_WRONLY){
 		*retval = -1;
 		return EBADF;	
 	}
@@ -209,16 +209,14 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
 int
 sys_close(int fd, int *retval)
 {
-	int result = 0;	
-	retval = NULL;
+	int result = 0;
 	struct openfile * file;
 
 	// 1. validate the fd number (use filetable_okfd)
 
-	if( (err = filetable_okfd(curproc->p_filetable, fd)) )
-	{
+	if( !filetable_okfd(curproc->p_filetable, fd) ){
 		*retval = -1;
-		return err;
+  		return EBADF;
 	}
 	// 2. use filetable_placeat to replace curproc's file table... entry with NULL.
 
@@ -226,12 +224,17 @@ sys_close(int fd, int *retval)
 
 	// 3. check if the previous entry in the file table was also NULL... (this means no such file was open)
 
+	if(file == NULL){
+ 		*retval = -1;
+  		return EFAULT;	
+	}
+/*
 	if( (err = filetable_get(curproc->p_filetable, fd, &file)) )
 	{
 		*retval = -1;
 		return err;
 	}
-	
+*/	
 	// 4. decref the open file returned by filetable_placeat
 
 	openfile_decref(file);
