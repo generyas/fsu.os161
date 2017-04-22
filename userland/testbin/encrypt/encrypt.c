@@ -6,7 +6,6 @@
 int
 main(int argc, char *argv[])
 {
-	//printf("asjdnakjsdnakjdn");
 	static char writebuf[40] = "Twiddle dee dee, Twiddle dum dum.......\n";
 	//static char readbuf[41];
 
@@ -29,8 +28,7 @@ main(int argc, char *argv[])
 	if (fd<0) {
 		err(1, "%s: open for write", file);
 	}
-
-
+    
 	rv = write(fd, writebuf, 40);
 	if (rv<0) {
 		err(1, "%s: write", file);
@@ -49,32 +47,6 @@ main(int argc, char *argv[])
 	
 	rv = encrypt(fd);
 	
-	
-
-/*
-	rv = read(fd, readbuf, 40);
-	if (rv<0) {
-		err(1, "%s: read", file);
-	}
-
-	rv = close(fd);
-	printf("Closing fd=%d retval=%d.\n", fd, rv);
-
-	if (rv<0) {
-		err(1, "%s: close (2nd time)", file);
-	}
-
-	// ensure null termination 
-	readbuf[40] = 0;
-
-	if (strcmp(readbuf, writebuf)) {
-		errx(1, "Buffer data mismatch!");
-	}
-*/
-/*	rv = remove(file);
-	if (rv<0) {
-		err(1, "%s: remove", file);
-	} */
 	printf("Passed encrypting.\n");
 	return 0;
 }
