@@ -114,7 +114,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 
 	if (file->of_accmode == O_WRONLY){
 		*retval = -1;
-		return EBADF;	
+		return EACCES;	
 	}
 
 	// 4. cons up a uio
@@ -175,7 +175,7 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
 
 	if (file->of_accmode == O_RDONLY){
 		*retval = -1;
-		return EBADF;	
+		return EACCES;	
 	}
 
 	// cons up a uio    
@@ -243,10 +243,104 @@ sys_close(int fd, int *retval)
     return result;
 }
 
+#define BUF_LEN 4
+
+int
+sys_encrypt(int fd, int *retval)
+{    
+    unsigned char buf[BUF_LEN];
+    unsigned int buf_shift = 0;
+   
+    while (true)
+    {
+        buf[0] = 0;
+        buf[1] = 0;
+        buf[2] = 0;
+        buf[3] = 0;
+       
+        DEBUG(DB_SYSCALL,"T1\n");
+ 
+        if ((err = sys_read(fd, (userptr_t) buf, BUF_LEN, retval)))
+        {
+            *retval = -1;
+            return err;
+        }
+        if (retval == 0)
+            break;
+	DEBUG(DB_SYSCALL,"read _ret: %d\n", *retval);
+ 
+        DEBUG(DB_SYSCALL,"BUF: %c %c %c %c\n", buf[0], buf[1], buf[2], buf[3]);
+ 
+        buf_shift = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+ 
+        DEBUG(DB_SYSCALL,"SHIFT PRE: %d\n", buf_shift);
+ 
+        buf_shift = (buf_shift >> 10) | (buf_shift << 22);
+ 
+        buf[3] = (buf_shift & 0xFF000000) >> 24;
+        buf[0] = (buf_shift & 0x00FF0000) >> 16;
+        buf[1] = (buf_shift & 0x0000FF00) >> 8;
+        buf[2] = (buf_shift & 0x000000FF);
+ 
+        DEBUG(DB_SYSCALL,"SHIFT POST: %d\n", buf_shift);
+ 
+        if ((err = sys_write(fd, (userptr_t) buf, BUF_LEN, retval)))
+        {
+            *retval = -1;
+            return err;
+        }
+	DEBUG(DB_SYSCALL,"write _ret: %d\n", *retval);
+ 
+        DEBUG(DB_SYSCALL,"T2\n");
+    }
+   
+    return 0;
+}
+
+/*
 int
 sys_encrypt(int fd, int *retval)
 {
-	(void)fd;
-	(void)retval;
-	return 0;
+    (void)fd;
+    (void)retval;
+   
+    unsigned char buf[BUF_LEN];
+    unsigned int buf_shift = 0;
+   
+    DEBUG(DB_SYSCALL,"T1\n");
+   
+    if ((err = sys_read(fd, (userptr_t) buf, BUF_LEN, retval)))
+    {
+        *retval = -1;
+        return err;
+    }
+   
+    DEBUG(DB_SYSCALL,"BUF 1: %c %c %c %c\n", buf[0], buf[1], buf[2], buf[3]);
+    DEBUG(DB_SYSCALL,"BUF asc: %d %d %d %d\n", buf[0], buf[1], buf[2], buf[3]);
+   
+    buf_shift = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+   
+    DEBUG(DB_SYSCALL,"SHIFT PRE: %d\n", buf_shift);
+   
+    buf_shift = (buf_shift >> 10) | (buf_shift << 22);
+   
+    DEBUG(DB_SYSCALL,"SHIFT POST: %d\n", buf_shift);
+
+    buf[3] = (buf_shift & 0xFF000000) >> 24;
+    buf[0] = (buf_shift & 0x00FF0000) >> 16;
+    buf[1] = (buf_shift & 0x0000FF00) >> 8;
+    buf[2] = (buf_shift & 0x000000FF);
+
+    DEBUG(DB_SYSCALL,"BUF 2: %d %d %d %d\n", buf[0], buf[1], buf[2], buf[3]);
+   
+    if ((err = sys_write(fd, (userptr_t) buf, BUF_LEN, retval)))
+    {
+        *retval = -1;
+        return err;
+    }
+   
+    DEBUG(DB_SYSCALL,"T2\n");
+   
+    return 0;
 }
+*/
