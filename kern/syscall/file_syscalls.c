@@ -131,7 +131,7 @@ sys_read(int fd, userptr_t buf, size_t size, int *retval)
 		return err;
 	}
 	
-	*retval = u.uio_offset; // setting result to amount of bits read
+	*retval = u.uio_offset -  file->of_offset; // setting result to amount of bits read
 
 	// 6. update the seek position afterwards
 	
@@ -189,6 +189,8 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
 	uio_kinit(&iov, &u, buf, nbytes, file->of_offset, UIO_WRITE);
     
     VOP_WRITE(file->of_vnode, &u);
+
+	*retval = u.uio_offset - file->of_offset;
     
 	// update the seek position afterwards
     //DEBUG(DB_SYSCALL,"Offsets W Pre: %d %d\n", (int)file->of_offset, (int)u.uio_offset);
@@ -205,7 +207,6 @@ sys_write(int fd, userptr_t buf, size_t nbytes, int *retval)
     
 	// set the return value correctly
 
-    *retval = u.uio_offset;
     return 0;
 }
 
@@ -292,45 +293,46 @@ sys_encrypt(int fd, int *retval)
         buf[2] = 0;
         buf[3] = 0;
        
-        //DEBUG(DB_SYSCALL,"T1\n");
+        DEBUG(DB_SYSCALL,"T1\n");
  
         if ((err = sys_read(fd, (userptr_t) buf, BUF_LEN, retval)))
         {
             *retval = -1;
             return err;
         }
-        if (buf[0] == 0)
+        if (*retval == 0)
             break;
+	
         
-        //DEBUG(DB_SYSCALL,"read _ret: %d\n", *retval);
+        DEBUG(DB_SYSCALL,"read _ret: %d\n", *retval);
  
         DEBUG(DB_SYSCALL,"BUF  PRE: %d %d %d %d\n", buf[0], buf[1], buf[2], buf[3]);
  
         buf_shift = (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
  
-        //DEBUG(DB_SYSCALL,"SHIFT PRE: %d\n", buf_shift);
+        DEBUG(DB_SYSCALL,"SHIFT PRE: %d\n", buf_shift);
  
         buf_shift = (buf_shift >> 10) | (buf_shift << 22);
  
-        buf[3] = (buf_shift & 0xFF000000) >> 24;
-        buf[0] = (buf_shift & 0x00FF0000) >> 16;
-        buf[1] = (buf_shift & 0x0000FF00) >> 8;
-        buf[2] = (buf_shift & 0x000000FF);
+        buf[0] = (buf_shift & 0xFF000000) >> 24;
+        buf[1] = (buf_shift & 0x00FF0000) >> 16;
+        buf[2] = (buf_shift & 0x0000FF00) >> 8;
+        buf[3] = (buf_shift & 0x000000FF);
  
-        //DEBUG(DB_SYSCALL,"SHIFT POST: %d\n", buf_shift);
+        DEBUG(DB_SYSCALL,"SHIFT POST: %d\n", buf_shift);
         
-        sys_seek(fd, -BUF_LEN, retval);
+        sys_seek(fd, -(off_t)(*retval), retval);
  
         if ((err = sys_write(fd, (userptr_t) buf, BUF_LEN, retval)))
         {
             *retval = -1;
             return err;
         }
-	    //DEBUG(DB_SYSCALL,"write _ret: %d\n", *retval);
+	    DEBUG(DB_SYSCALL,"write _ret: %d\n", *retval);
         
         DEBUG(DB_SYSCALL,"BUF POST: %d %d %d %d\n", buf[0], buf[1], buf[2], buf[3]);
  
-        //DEBUG(DB_SYSCALL,"T2\n");
+        DEBUG(DB_SYSCALL,"T2\n");
     }
    
     return 0;
